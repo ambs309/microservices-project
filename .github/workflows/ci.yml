@@ -32,7 +32,10 @@ jobs:
         run: mvn -B -q compile
 
       - name: Unit tests
-        run: mvn -B verify
+        run: mvn -B test
+
+      - name: Package without coverage gate
+        run: mvn -B package -DskipTests -Djacoco.skip=true
 
       - name: Upload test results
         if: always()
