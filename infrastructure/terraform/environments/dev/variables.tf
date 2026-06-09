@@ -78,7 +78,12 @@ variable "db_password" {
 variable "allowed_ssh_cidr" {
   description = "CIDR block allowed to access the EC2 instance by SSH."
   type        = string
-  default     = "0.0.0.0/0"
+}
+
+variable "ec2_key_name" {
+  description = "Existing AWS EC2 key pair name used for SSH access."
+  type        = string
+  default     = null
 }
 
 variable "ec2_instance_type" {

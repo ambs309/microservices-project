@@ -44,6 +44,7 @@ module "ec2" {
   public_subnet_id      = module.vpc.public_subnet_ids[0]
   instance_profile_name = module.iam.ec2_instance_profile_name
   allowed_ssh_cidr      = var.allowed_ssh_cidr
+  key_name              = var.ec2_key_name
   instance_type         = var.ec2_instance_type
 }
 

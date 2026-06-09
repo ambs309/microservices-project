@@ -15,8 +15,12 @@ variable "instance_profile_name" {
 }
 
 variable "allowed_ssh_cidr" {
+  type = string
+}
+
+variable "key_name" {
   type    = string
-  default = "0.0.0.0/0"
+  default = null
 }
 
 variable "instance_type" {
