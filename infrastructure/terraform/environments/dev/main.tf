@@ -27,3 +27,11 @@ module "sqs" {
 
   name_prefix = local.name_prefix
 }
+
+module "iam" {
+  source = "../../modules/iam"
+
+  name_prefix           = local.name_prefix
+  sqs_queue_arn         = module.sqs.product_events_queue_arn
+  dead_letter_queue_arn = module.sqs.dead_letter_queue_arn
+}

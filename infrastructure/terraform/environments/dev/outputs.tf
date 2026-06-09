@@ -37,3 +37,11 @@ output "dead_letter_queue_url" {
 output "dead_letter_queue_arn" {
   value = module.sqs.dead_letter_queue_arn
 }
+
+output "ec2_instance_profile_name" {
+  value = module.iam.ec2_instance_profile_name
+}
+
+output "ec2_role_name" {
+  value = module.iam.ec2_role_name
+}
