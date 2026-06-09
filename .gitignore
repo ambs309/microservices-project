@@ -53,3 +53,11 @@ logs/
 # Service PIDs
 .service-pids
 
+
+# Terraform local variables and state
+**/terraform.tfvars
+**/*.tfvars
+!**/*.tfvars.example
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
