@@ -56,3 +56,21 @@ variable "availability_zones" {
   type        = list(string)
   default     = ["eu-central-1a", "eu-central-1b"]
 }
+
+variable "db_name" {
+  description = "Application database name."
+  type        = string
+  default     = "microservices"
+}
+
+variable "db_username" {
+  description = "Application database username."
+  type        = string
+  default     = "appuser"
+}
+
+variable "db_password" {
+  description = "Application database password."
+  type        = string
+  sensitive   = true
+}

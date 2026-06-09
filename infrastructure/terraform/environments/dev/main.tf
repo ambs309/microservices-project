@@ -35,3 +35,14 @@ module "iam" {
   sqs_queue_arn         = module.sqs.product_events_queue_arn
   dead_letter_queue_arn = module.sqs.dead_letter_queue_arn
 }
+
+module "rds" {
+  source = "../../modules/rds"
+
+  name_prefix        = local.name_prefix
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+  db_name            = var.db_name
+  db_username        = var.db_username
+  db_password        = var.db_password
+}

@@ -45,3 +45,11 @@ output "ec2_instance_profile_name" {
 output "ec2_role_name" {
   value = module.iam.ec2_role_name
 }
+
+output "db_instance_endpoint" {
+  value = module.rds.db_instance_endpoint
+}
+
+output "db_name" {
+  value = module.rds.db_name
+}
