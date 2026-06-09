@@ -74,3 +74,15 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
+
+variable "allowed_ssh_cidr" {
+  description = "CIDR block allowed to access the EC2 instance by SSH."
+  type        = string
+  default     = "0.0.0.0/0"
+}
+
+variable "ec2_instance_type" {
+  description = "EC2 instance type."
+  type        = string
+  default     = "t3.micro"
+}

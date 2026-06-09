@@ -36,13 +36,25 @@ module "iam" {
   dead_letter_queue_arn = module.sqs.dead_letter_queue_arn
 }
 
+module "ec2" {
+  source = "../../modules/ec2"
+
+  name_prefix           = local.name_prefix
+  vpc_id                = module.vpc.vpc_id
+  public_subnet_id      = module.vpc.public_subnet_ids[0]
+  instance_profile_name = module.iam.ec2_instance_profile_name
+  allowed_ssh_cidr      = var.allowed_ssh_cidr
+  instance_type         = var.ec2_instance_type
+}
+
 module "rds" {
   source = "../../modules/rds"
 
-  name_prefix        = local.name_prefix
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  db_name            = var.db_name
-  db_username        = var.db_username
-  db_password        = var.db_password
+  name_prefix                = local.name_prefix
+  vpc_id                     = module.vpc.vpc_id
+  private_subnet_ids         = module.vpc.private_subnet_ids
+  allowed_security_group_ids = [module.ec2.security_group_id]
+  db_name                    = var.db_name
+  db_username                = var.db_username
+  db_password                = var.db_password
 }

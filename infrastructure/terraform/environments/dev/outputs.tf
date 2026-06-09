@@ -46,6 +46,18 @@ output "ec2_role_name" {
   value = module.iam.ec2_role_name
 }
 
+output "ec2_public_ip" {
+  value = module.ec2.public_ip
+}
+
+output "ec2_public_dns" {
+  value = module.ec2.public_dns
+}
+
+output "app_security_group_id" {
+  value = module.ec2.security_group_id
+}
+
 output "db_instance_endpoint" {
   value = module.rds.db_instance_endpoint
 }
