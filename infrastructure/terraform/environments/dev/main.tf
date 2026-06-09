@@ -21,3 +21,9 @@ module "vpc" {
   private_subnet_cidrs = var.private_subnet_cidrs
   availability_zones   = var.availability_zones
 }
+
+module "sqs" {
+  source = "../../modules/sqs"
+
+  name_prefix = local.name_prefix
+}
