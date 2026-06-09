@@ -40,7 +40,3 @@ variable "db_allocated_storage" {
   default = 20
 }
 
-variable "db_engine_version" {
-  type    = string
-  default = "16.3"
-}

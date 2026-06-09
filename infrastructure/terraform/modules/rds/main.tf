@@ -43,7 +43,6 @@ resource "aws_db_instance" "main" {
   identifier = "${var.name_prefix}-postgres"
 
   engine         = "postgres"
-  engine_version = var.db_engine_version
   instance_class = var.db_instance_class
 
   allocated_storage     = var.db_allocated_storage
