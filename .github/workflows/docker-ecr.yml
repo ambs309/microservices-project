@@ -1,0 +1,50 @@
+name: Build and Push Docker Images to ECR
+
+on:
+  push:
+    branches:
+      - final-project-approach-a-clean
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: 096631344736.dkr.ecr.eu-central-1.amazonaws.com
+
+jobs:
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - user-service
+          - product-service
+          - order-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/cis-final-project-dev-${{ matrix.service }}:${{ github.sha }} \
+            -t $ECR_REGISTRY/cis-final-project-dev-${{ matrix.service }}:latest \
+            ./${{ matrix.service }}
+
+      - name: Push Docker image
+        run: |
+          docker push $ECR_REGISTRY/cis-final-project-dev-${{ matrix.service }}:${{ github.sha }}
+          docker push $ECR_REGISTRY/cis-final-project-dev-${{ matrix.service }}:latest
