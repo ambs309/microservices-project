@@ -65,3 +65,15 @@ output "db_instance_endpoint" {
 output "db_name" {
   value = module.rds.db_name
 }
+
+output "ecr_repository_names" {
+  value = module.ecr.repository_names
+}
+
+output "ecr_repository_urls" {
+  value = module.ecr.repository_urls
+}
+
+output "ecr_repository_arns" {
+  value = module.ecr.repository_arns
+}
