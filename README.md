@@ -1,627 +1,1153 @@
-# Microservices Template - Cloud Computing
+````markdown
+# Cloud Information Systems - Final Project
 
-This project serves as a **base template** for developing microservices in Java with Spring Boot, designed for educational purposes in Cloud Computing courses.
+## Microservices Project deployed on AWS with Terraform, Docker, ECR, GitHub Actions and Ansible
 
-** IMPORTANT:** This is an initial template. Students must complete the functionalities according to the course plan, including:
-- **Dockerfiles** (Week 2) - Create Dockerfiles for each microservice
-- **Docker Compose** (Week 2) - Create docker-compose.yml to orchestrate all services
-- Additional unit tests
-- CI/CD pipelines (Week 10)
-- And other functionalities as per the course plan
+This repository contains a cloud deployment of a Java Spring Boot microservices application for the **Cloud Information Systems** final project.
 
-**Note:** Students must implement Dockerfiles and complete `docker-compose.yml` as part of Week 2 (see course materials).
+The goal of this project is not only to run a set of microservices, but to demonstrate a complete cloud engineering workflow:
 
-## Project Overview
+1. provision AWS infrastructure with Terraform;
+2. containerize each microservice with Docker;
+3. store Docker images in Amazon ECR;
+4. automate build and push using GitHub Actions;
+5. deploy the application to an EC2 instance using Ansible;
+6. expose the system through an API Gateway;
+7. validate the deployment through terminal commands.
 
-This is a microservices-based application demonstrating a modern cloud-native architecture. The project consists of four main services:
+The project reuses the provided microservices application from the course and extends it with cloud infrastructure, automation and deployment tooling.
 
-1. **API Gateway** - Single entry point for all client requests using Spring Cloud Gateway
-2. **User Service** - Manages user data and operations
-3. **Product Service** - Manages product catalog and inventory
-4. **Order Service** - Manages orders with inter-service communication (Kafka + OpenFeign)
+---
 
-## Architecture
+## Repository
 
-```
-┌─────────────┐
-│   Client    │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────┐
-│   API Gateway   │  Port: 8080
-│ (Spring Gateway)│
-└─────┬───────┬───┬───┘
-      │       │   │
-      ▼       ▼   ▼
-┌──────────┐ ┌──────────────┐ ┌──────────────┐
-│   User   │ │   Product   │ │    Order    │
-│ Service  │ │   Service   │ │   Service   │
-│ Port:    │ │ Port:       │ │ Port:       │
-│  8081    │ │  8082       │ │  8083       │
-└──────────┘ └──────────────┘ └──────────────┘
-      ▲              ▲              │
-      │              │              │
-      └──────────────┴──────────────┘
-              OpenFeign (Sync)
-      
-      ┌──────────────────────────┐
-      │        Kafka             │
-      │  (Async Event-Driven)    │
-      └──────────────────────────┘
+```text
+https://github.com/ambs309/microservices-project
 ```
 
-## Project Structure
+Main working branch:
 
+```text
+final-project-approach-a-clean
 ```
+
+---
+
+## 1. Application overview
+
+The application is composed of four Spring Boot services:
+
+| Service | Description | Port |
+|---|---|---|
+| API Gateway | Single entry point for client requests using Spring Cloud Gateway | 8088 on AWS |
+| User Service | Manages users | 8081 |
+| Product Service | Manages products and inventory | 8082 |
+| Order Service | Manages orders and communicates with User/Product services | 8083 |
+
+The API Gateway exposes the backend services through `/api/...` routes.
+
+The direct backend routes are:
+
+```text
+http://localhost:8081/users
+http://localhost:8082/products
+http://localhost:8083/orders
+```
+
+Through the gateway:
+
+```text
+http://localhost:8088/api/users
+http://localhost:8088/api/products
+http://localhost:8088/api/orders
+```
+
+Expected result on a clean database:
+
+```text
+[]
+[]
+[]
+```
+
+---
+
+## 2. Cloud architecture
+
+The AWS architecture created for this project includes:
+
+```text
+AWS Region: eu-central-1
+
+VPC
+├── Public Subnets
+│   └── EC2 instance running Docker containers
+├── Private Subnets
+│   └── RDS PostgreSQL database
+├── Internet Gateway
+├── Security Groups
+├── IAM Role for EC2
+├── SQS queue + Dead Letter Queue
+├── ECR repositories
+└── AWS Budget alert
+```
+
+The application deployment flow is:
+
+```text
+Developer
+   |
+   | git push
+   v
+GitHub Actions
+   |
+   | build Docker images
+   | push images
+   v
+Amazon ECR
+   |
+   | ansible deploy
+   | docker pull
+   v
+EC2 instance
+   |
+   | docker-compose
+   v
+API Gateway + Microservices
+```
+
+---
+
+## 3. Technologies used
+
+### Application
+
+```text
+Java 21
+Spring Boot 3.4.0
+Spring Cloud Gateway
+Spring Data JPA
+OpenFeign
+Kafka dependencies from the original application
+H2 database for the current application runtime
+Maven
+JUnit 5
+Mockito
+Docker
+```
+
+### Cloud and DevOps
+
+```text
+AWS EC2
+AWS VPC
+AWS RDS PostgreSQL
+AWS SQS + DLQ
+AWS ECR
+AWS IAM
+AWS Budgets
+Terraform
+GitHub Actions
+Ansible
+Docker Compose
+Kafka
+Zookeeper
+```
+
+---
+
+## 4. Project structure
+
+```text
 microservices-project/
-├── api-gateway/          # API Gateway using Spring Cloud Gateway
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── pt/ulusofona/apigateway/
-│   │   │   │       ├── ApiGatewayApplication.java
-│   │   │   │       └── config/
-│   │   │   │           └── GatewayConfig.java
-│   │   │   └── resources/
-│   │   │       └── application.yml
-│   │   └── test/
-│   └── pom.xml
-├── user-service/         # User management microservice
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── pt/ulusofona/userservice/
-│   │   │   │       ├── UserServiceApplication.java
-│   │   │   │       ├── controller/
-│   │   │   │       │   ├── UserController.java
-│   │   │   │       │   └── GlobalExceptionHandler.java
-│   │   │   │       ├── service/
-│   │   │   │       │   └── UserService.java
-│   │   │   │       ├── repository/
-│   │   │   │       │   └── UserRepository.java
-│   │   │   │       ├── model/
-│   │   │   │       │   └── User.java
-│   │   │   │       └── dto/
-│   │   │   │           ├── UserRequest.java
-│   │   │   │           └── UserResponse.java
-│   │   │   └── resources/
-│   │   │       └── application.yml
-│   │   └── test/
-│   └── pom.xml
-├── product-service/      # Product management microservice
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── pt/ulusofona/productservice/
-│   │   │   │       ├── ProductServiceApplication.java
-│   │   │   │       ├── controller/
-│   │   │   │       │   ├── ProductController.java
-│   │   │   │       │   └── GlobalExceptionHandler.java
-│   │   │   │       ├── service/
-│   │   │   │       │   └── ProductService.java
-│   │   │   │       ├── repository/
-│   │   │   │       │   └── ProductRepository.java
-│   │   │   │       ├── model/
-│   │   │   │       │   └── Product.java
-│   │   │   │       └── dto/
-│   │   │   │           ├── ProductRequest.java
-│   │   │   │           └── ProductResponse.java
-│   │   │   └── resources/
-│   │   │       └── application.yml
-│   │   └── test/
-│   └── pom.xml
-├── order-service/        # Order management microservice (Kafka + OpenFeign)
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── pt/ulusofona/orderservice/
-│   │   │   │       ├── OrderServiceApplication.java
-│   │   │   │       ├── controller/
-│   │   │   │       │   ├── OrderController.java
-│   │   │   │       │   └── GlobalExceptionHandler.java
-│   │   │   │       ├── service/
-│   │   │   │       │   └── OrderService.java
-│   │   │   │       ├── repository/
-│   │   │   │       │   └── OrderRepository.java
-│   │   │   │       ├── model/
-│   │   │   │       │   ├── Order.java
-│   │   │   │       │   ├── OrderItem.java
-│   │   │   │       │   └── OrderStatus.java
-│   │   │   │       ├── dto/
-│   │   │   │       │   ├── OrderRequest.java
-│   │   │   │       │   ├── OrderResponse.java
-│   │   │   │       │   └── OrderItemRequest.java
-│   │   │   │       ├── client/
-│   │   │   │       │   ├── UserServiceClient.java (OpenFeign)
-│   │   │   │       │   └── ProductServiceClient.java (OpenFeign)
-│   │   │   │       ├── event/
-│   │   │   │       │   ├── OrderCreatedEvent.java
-│   │   │   │       │   └── OrderStatusChangedEvent.java
-│   │   │   │       └── config/
-│   │   │   │           └── KafkaConfig.java
-│   │   │   └── resources/
-│   │   │       └── application.yml
-│   │   └── test/
-│   └── pom.xml
-├── Aulas/                # Course materials and documentation
-├── README.md             # This file
-└── API_EXAMPLES.md       # API usage examples
+├── api-gateway/
+│   ├── Dockerfile
+│   └── src/
+├── user-service/
+│   ├── Dockerfile
+│   └── src/
+├── product-service/
+│   ├── Dockerfile
+│   └── src/
+├── order-service/
+│   ├── Dockerfile
+│   └── src/
+├── ansible/
+│   └── deploy.yml
+├── infrastructure/
+│   └── terraform/
+│       ├── environments/
+│       │   └── dev/
+│       │       ├── main.tf
+│       │       ├── variables.tf
+│       │       ├── outputs.tf
+│       │       ├── providers.tf
+│       │       └── terraform.tfvars.example
+│       └── modules/
+│           ├── budget/
+│           ├── ecr/
+│           ├── ec2/
+│           ├── iam/
+│           ├── rds/
+│           ├── sqs/
+│           └── vpc/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       └── docker-ecr.yml
+├── docker-compose.yml
+├── docker-compose.light.yml
+├── pom.xml
+└── README.md
 ```
 
-## Technologies Used
+---
 
-- **Java 21** (LTS) - Programming language
-- **Spring Boot 3.4.0** - Application framework (latest stable version)
-- **Spring Cloud 2024.0.0** - Latest release train for microservices
-- **Spring Cloud Gateway** - API Gateway for routing and load balancing
-- **Spring Data JPA** - Data persistence abstraction
-- **Spring Kafka** - Asynchronous messaging and event-driven communication
-- **OpenFeign** - Declarative HTTP client for synchronous inter-service communication
-- **H2 Database** - In-memory database for development
-- **Apache Kafka** - Distributed event streaming platform
-- **JUnit 5 & Mockito** - Unit testing framework
-- **Maven** - Dependency management and build tool
-- **Lombok 1.18.34** - Reduces boilerplate code (latest version)
-- **Spring Boot Actuator** - Monitoring and health checks
-- **Jakarta Validation** - Bean validation framework
-- **SpringDoc OpenAPI 2.6.0** - API documentation (Swagger UI)
-- **Micrometer & Prometheus** - Metrics collection and observability
-## Prerequisites
+## 5. What each part does
 
-Before running this project, ensure you have the following installed:
+### Terraform
 
-- **Java 21** (LTS) - **Required**
-  - Check installation: `java -version`
-  - **Important:** This project requires Java 21. Java 25+ may have compatibility issues with Lombok.
-  - Download from: [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) or [OpenJDK](https://openjdk.org/)
-  - On macOS, you can install via Homebrew: `brew install openjdk@21`
-  - Set JAVA_HOME: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)`
-- **Maven 3.8+**
-  - Check installation: `mvn -version`
-  - Download from: [Apache Maven](https://maven.apache.org/download.cgi)
-- **Git**
-  - Check installation: `git --version`
-  - Download from: [Git](https://git-scm.com/downloads)
-- **Docker** (Optional, for running Kafka and services via docker-compose)
-  - Check installation: `docker --version`
-  - Download from: [Docker](https://www.docker.com/get-started)
-- **IDE** (Recommended: IntelliJ IDEA, Eclipse, or VS Code)
-  - **Note:** If using IntelliJ IDEA, ensure Lombok plugin is installed and annotation processing is enabled
+Terraform creates the AWS infrastructure:
 
-## How to Run Locally
-
-### Option 1: Run Each Service Separately
-
-Open three separate terminal windows:
-
-**Terminal 1 - User Service:**
-```bash
-cd user-service
-mvn spring-boot:run
+```text
+VPC
+Subnets
+Route tables
+Internet Gateway
+Security Groups
+EC2 instance
+RDS PostgreSQL database
+SQS queue
+Dead Letter Queue
+IAM role and policies
+ECR repositories
+Budget alert
 ```
 
-**Terminal 2 - Product Service:**
-```bash
-cd product-service
-mvn spring-boot:run
+The infrastructure code is located in:
+
+```text
+infrastructure/terraform/
 ```
 
-**Terminal 3 - Order Service:**
-```bash
-cd order-service
-mvn spring-boot:run
+The main environment is:
+
+```text
+infrastructure/terraform/environments/dev/
 ```
 
-**Terminal 4 - API Gateway:**
-```bash
-cd api-gateway
-mvn spring-boot:run
+### Docker
+
+Each service has its own Dockerfile:
+
+```text
+api-gateway/Dockerfile
+user-service/Dockerfile
+product-service/Dockerfile
+order-service/Dockerfile
 ```
 
-**Important:** Before starting the services, ensure Kafka is running:
-```bash
-# Using Docker Compose (recommended)
-docker-compose up -d zookeeper kafka
+Each image is built independently and pushed to its own ECR repository.
 
-# Or install Kafka locally and start it
+### GitHub Actions
+
+There are two workflows:
+
+```text
+.github/workflows/ci.yml
+.github/workflows/docker-ecr.yml
 ```
 
-### Option 2: Build and Run JAR Files
+The first workflow runs Maven tests.
+
+The second workflow builds and pushes Docker images to Amazon ECR.
+
+### Ansible
+
+Ansible is used to deploy the application on the EC2 instance.
+
+The playbook:
+
+```text
+ansible/deploy.yml
+```
+
+It performs the following actions:
+
+```text
+Installs required packages
+Starts Docker
+Installs Docker Compose
+Logs in to Amazon ECR
+Creates a Docker Compose file using ECR images
+Stops previous containers
+Pulls latest images
+Starts all services
+Shows running containers
+```
+
+---
+
+## 6. Prerequisites
+
+To reproduce this project, the following tools are required on the local machine:
+
+```text
+Git
+Java 21
+Maven
+Docker
+AWS CLI
+Terraform
+GitHub CLI
+SSH client
+```
+
+Check versions:
 
 ```bash
-# Build all services
-mvn clean package
-
-# Run User Service
-cd user-service
-java -jar target/user-service-1.0.0.jar
-
-# Run Product Service (in another terminal)
-cd product-service
-java -jar target/product-service-1.0.0.jar
-
-# Run API Gateway (in another terminal)
-cd api-gateway
-java -jar target/api-gateway-1.0.0.jar
+git --version
+java -version
+mvn -version
+docker --version
+aws --version
+terraform version
+gh --version
 ```
 
-### Service Endpoints
-
-Once all services are running, they will be available at:
-
-- **API Gateway**: http://localhost:8080
-- **User Service**: http://localhost:8081
-- **Product Service**: http://localhost:8082
-- **Order Service**: http://localhost:8083
-
-**Kafka** should be running on:
-- **Kafka Broker**: localhost:9092
-- **Zookeeper**: localhost:2181
-
-## API Endpoints
-
-### API Gateway (Port 8080)
-
-All requests should go through the API Gateway:
-
-- `GET /api/users` - List all users
-- `GET /api/users/{id}` - Get user by ID
-- `POST /api/users` - Create new user
-- `PUT /api/users/{id}` - Update user
-- `DELETE /api/users/{id}` - Delete user
-- `GET /api/products` - List all products
-- `GET /api/products/{id}` - Get product by ID
-- `POST /api/products` - Create new product
-- `PUT /api/products/{id}` - Update product
-- `DELETE /api/products/{id}` - Delete product
-- `GET /api/orders` - List all orders
-- `GET /api/orders/{id}` - Get order by ID
-- `GET /api/orders/user/{userId}` - Get orders by user ID
-- `POST /api/orders` - Create new order
-- `PUT /api/orders/{id}/status` - Update order status
-
-### User Service (Port 8081)
-
-Direct access to User Service (bypassing gateway):
-
-- `GET /users` - List all users
-- `GET /users/{id}` - Get user by ID
-- `POST /users` - Create new user
-- `PUT /users/{id}` - Update user
-- `DELETE /users/{id}` - Delete user
-
-### Product Service (Port 8082)
-
-Direct access to Product Service (bypassing gateway):
-
-- `GET /products` - List all products
-- `GET /products/{id}` - Get product by ID
-- `POST /products` - Create new product
-- `PUT /products/{id}` - Update product
-- `DELETE /products/{id}` - Delete product
-
-### Order Service (Port 8083)
-
-Direct access to Order Service (bypassing gateway):
-
-- `GET /orders` - List all orders
-- `GET /orders/{id}` - Get order by ID
-- `GET /orders/user/{userId}` - Get orders by user ID
-- `POST /orders` - Create new order
-- `PUT /orders/{id}/status?status={status}` - Update order status
-
-## Running Tests
-
-Execute tests for each service:
+The AWS CLI must be configured:
 
 ```bash
-# Set Java 21 (if not default)
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-
-# Run User Service tests
-cd user-service
-mvn test
-
-# Run Product Service tests
-cd product-service
-mvn test
-
-# Run Order Service tests
-cd order-service
-mvn test
-
-# Run API Gateway tests
-cd api-gateway
-mvn test
-
-# Run all tests from root
-mvn test -pl user-service,product-service,order-service,api-gateway
+aws configure
 ```
 
-### Test Coverage
-
-The project uses **JaCoCo** for coverage. Each module enforces a minimum line coverage (85% for services, 70% for API Gateway). After running `mvn test`, open the report at `target/site/jacoco/index.html` in each module.
-
-- **User Service**: Controller tests (CRUD + validation + exception handler), Service tests (all branches including email-in-use), GlobalExceptionHandler, Application context
-- **Product Service**: Controller tests (CRUD + search + exception handler), Service tests (including null stockQuantity branches), OrderEventConsumer (success, product not found, insufficient stock, multiple items, save failure), GlobalExceptionHandler, Application context
-- **Order Service**: Controller tests (create, validation, get by id, exception handler), Service tests (create/get/update, user/product not found, insufficient stock), GlobalExceptionHandler, Order model (addOrderItem, calculateTotal), Application context
-- **API Gateway**: Application context (loads GatewayConfig)
-
-All tests use:
-- **JUnit 5** for test framework
-- **Mockito** for mocking dependencies
-- **Spring Boot Test** for integration tests
-- **JaCoCo** for coverage reports and minimum coverage checks
-- **MockMvc** for controller testing
-- **Spring Kafka Test** for Kafka integration testing
-
-### Best Practices Implemented
-
-- ✅ **OpenAPI/Swagger Documentation** - Complete API documentation for all services
-- ✅ **Observability** - Prometheus metrics via Actuator
-- ✅ **Comprehensive Testing** - Unit and integration tests with high coverage
-- ✅ **Error Handling** - Global exception handlers with proper HTTP status codes
-- ✅ **Validation** - Jakarta Validation for request validation
-- ✅ **Modern Dependencies** - Latest stable versions of all frameworks
-- ✅ **API Gateway** - Centralized routing with order service support
-
-## Inter-Service Communication
-
-This project demonstrates two types of inter-service communication:
-
-### 1. Synchronous Communication (OpenFeign)
-
-**Order Service** uses OpenFeign to make synchronous HTTP calls to:
-- **User Service** - Validates user existence before creating orders
-- **Product Service** - Validates products and fetches product details
-
-**Example Flow:**
-```
-Order Service → (OpenFeign) → User Service: Validate user
-Order Service → (OpenFeign) → Product Service: Validate products & get details
-Order Service: Create order
-```
-
-### 2. Asynchronous Communication (Kafka)
-
-**Order Service** publishes events to Kafka topics:
-- `order-created` - Published when a new order is created
-- `order-status-changed` - Published when order status changes
-
-**Product Service** consumes events from Kafka:
-- Listens to `order-created` topic to update inventory
-
-**Example Flow:**
-```
-Order Service: Creates order → Publishes OrderCreatedEvent to Kafka
-Product Service: Consumes event → Updates product inventory
-```
-
-## Microservice Architecture
-
-Each microservice follows a layered architecture pattern:
-
-```
-┌─────────────────────┐
-│   Controller Layer  │  REST API endpoints
-├─────────────────────┤
-│   Service Layer     │  Business logic
-├─────────────────────┤
-│  Repository Layer   │  Data access
-├─────────────────────┤
-│    Model Layer      │  Entity/Domain models
-└─────────────────────┘
-```
-
-### Layer Responsibilities
-
-1. **Controller Layer** - Handles HTTP requests/responses, input validation
-2. **Service Layer** - Contains business logic, transaction management
-3. **Repository Layer** - Data access abstraction, database operations
-4. **Model Layer** - Entity classes representing database tables
-5. **DTO Layer** - Data Transfer Objects for API communication
-
-## Course Tasks by Week
-
-### Week 2 - Docker and Dockerfile
-- [ ] Create Dockerfile for each microservice
-- [ ] Create docker-compose.yml for local orchestration
-- [ ] Test execution with Docker Compose
-- [ ] Implement multi-stage builds for optimization
-
-### Week 3 - DockerHub
-- [ ] Build Docker images
-- [ ] Push to DockerHub or institutional repository
-- [ ] Pull and execute in another environment
-- [ ] Tag images with version numbers
-
-### Week 4 - AWS CLI
-- [ ] Configure AWS CLI
-- [ ] Create automation scripts
-- [ ] Test AWS service interactions
-
-### Week 5 - AWS Networking
-- [ ] Create VPC and subnets
-- [ ] Configure route tables
-- [ ] Set up security groups
-- [ ] Configure internet gateway
-
-### Week 6 - EC2
-- [ ] Create EC2 instance
-- [ ] Manual container deployment on EC2
-- [ ] Configure security groups for services
-- [ ] Test remote access
-
-### Week 7 - Cloud Databases
-- [ ] Replace H2 with AWS RDS
-- [ ] Configure remote database connection
-- [ ] Update connection strings
-- [ ] Test database connectivity
-
-### Week 8-9 - Terraform
-- [ ] Create infrastructure with Terraform
-- [ ] Modularize Terraform code
-- [ ] Implement state management
-- [ ] Create reusable modules
-
-### Week 10 - CI/CD
-- [ ] Create GitHub Actions pipeline
-- [ ] Implement automated deployment
-- [ ] Add automated testing
-- [ ] Configure deployment environments
-
-### Week 11 - SQS (Event-Driven Architecture)
-- [ ] Integrate SQS for messaging
-- [ ] Implement event-driven architecture
-- [ ] Create message producers and consumers
-- [ ] Handle asynchronous communication
-
-### Week 12 - Ansible
-- [ ] Create Ansible playbooks
-- [ ] Automate configuration management
-- [ ] Implement infrastructure provisioning
-- [ ] Configure application deployment
-
-## API Usage Examples
-
-See **[API_EXAMPLES.md](API_EXAMPLES.md)** for practical API usage examples with curl commands and request/response samples.
-
-## Important Notes
-
-1. **Java Version**: **This project requires Java 21 (LTS)**. Java 25+ has compatibility issues with Lombok. See [COMPILATION.md](COMPILATION.md) for details.
-2. **Database**: Currently uses H2 in-memory database. Should be replaced with AWS RDS in Week 7.
-3. **Docker (Week 2)**: 
-   - **Students must create Dockerfiles** for each service (user-service, product-service, order-service, api-gateway)
-   - **Students must complete docker-compose.yml** in the project root (TODO structure is provided)
-   - See `Aulas/Week-02/` for detailed instructions
-4. **Tests**: Comprehensive unit tests are included (44+ test methods). All tests pass with Java 21.
-5. **CI/CD**: Pipelines must be created by students in Week 10.
-6. **Kafka**: Required for Order Service. Students will configure this in docker-compose.yml (Week 2).
-7. **Inter-Service Communication**: 
-   - **Synchronous**: OpenFeign (Order Service → User/Product Services)
-   - **Asynchronous**: Kafka (Order Service publishes events, Product Service consumes)
-3. **Tests**: Basic tests are included as examples. Students should expand test coverage.
-4. **CI/CD**: Pipelines must be created by students in Week 10.
-5. **Configuration**: Service URLs are hardcoded for local development. Will be updated when Docker Compose is implemented.
-
-## Health Checks & Observability
-
-Spring Boot Actuator is configured for health monitoring and observability:
-
-### Health Endpoints
-- **User Service**: http://localhost:8081/actuator/health
-- **Product Service**: http://localhost:8082/actuator/health
-- **Order Service**: http://localhost:8083/actuator/health
-- **API Gateway**: http://localhost:8080/actuator/health
-
-### Metrics (Prometheus)
-- **User Service**: http://localhost:8081/actuator/prometheus
-- **Product Service**: http://localhost:8082/actuator/prometheus
-- **Order Service**: http://localhost:8083/actuator/prometheus
-- **API Gateway**: http://localhost:8080/actuator/prometheus
-
-### API Documentation (Swagger UI)
-- **User Service**: http://localhost:8081/swagger-ui.html
-- **Product Service**: http://localhost:8082/swagger-ui.html
-- **Order Service**: http://localhost:8083/swagger-ui.html
-- **API Gateway**: http://localhost:8080/swagger-ui.html
-
-### OpenAPI JSON
-- **User Service**: http://localhost:8081/api-docs
-- **Product Service**: http://localhost:8082/api-docs
-- **Order Service**: http://localhost:8083/api-docs
-- **API Gateway**: http://localhost:8080/api-docs
-
-## Development Guidelines
-
-### Code Style
-- Follow Java naming conventions
-- Use meaningful variable and method names
-- Add Javadoc comments for public methods
-- Keep methods focused and single-purpose
-
-### Testing
-- Write unit tests for service layer
-- Write integration tests for controllers
-- Aim for at least 70% code coverage
-- Use meaningful test method names
-
-### Error Handling
-- Use appropriate HTTP status codes
-- Provide meaningful error messages
-- Log errors appropriately
-- Handle exceptions gracefully
-
-## Running with Docker Compose
-
-**⚠️ IMPORTANT:** Students must complete the `docker-compose.yml` file and create Dockerfiles for each service as part of Week 2 exercises.
-
-Once you've completed `docker-compose.yml` and built images from your Dockerfiles:
+The GitHub CLI must be authenticated:
 
 ```bash
-# Start all services (Kafka, Zookeeper, and all microservices)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop all services
-docker-compose down
+gh auth login
 ```
 
-**Note:** 
-- Make sure Docker is installed and running
-- You must create Dockerfiles for each service first (Week 2)
-- See `Aulas/Week-02/` for detailed instructions
+---
 
-## Troubleshooting
+## 7. Clone the project
 
-### Kafka Connection Issues
-If services cannot connect to Kafka:
 ```bash
-# Check if Kafka is running
-docker ps | grep kafka
-
-# Check Kafka logs
-docker-compose logs kafka
-
-# Verify Kafka is accessible
-telnet localhost 9092
+git clone https://github.com/ambs309/microservices-project.git
+cd microservices-project
+git checkout final-project-approach-a-clean
 ```
 
-### Port Already in Use
-If you get a "port already in use" error:
+---
+
+## 8. Run tests locally
+
+Before deploying anything to AWS, validate the application locally:
+
 ```bash
-# Find process using port
-lsof -i :8080  # or 8081, 8082
-
-# Kill process
-kill -9 <PID>
+mvn clean test
 ```
 
-### Database Connection Issues
-- Ensure H2 is properly configured in application.yml
-- Check database URL and credentials
-- Verify Spring Data JPA is properly configured
+Expected result:
 
-### Service Communication Issues
-- Verify all services are running
-- Check API Gateway routing configuration
-- Verify service URLs in GatewayConfig.java
+```text
+BUILD SUCCESS
+```
 
-## Contributing
+---
 
-This is an educational template. Students should complete functionalities according to the course plan.
+## 9. Run locally with Docker Compose
 
-## License
+A lightweight Docker Compose file is available for running the four main services without Kafka/Zookeeper.
 
-This project is for educational purposes.
+This lightweight mode is useful for proving that the API Gateway and the three main backend services work correctly with lower resource usage.
 
-## Additional Resources
+```bash
+docker-compose -f docker-compose.light.yml up -d
+```
 
-- [Spring Boot Documentation](https://spring.io/projects/spring-boot)
-- [Spring Cloud Gateway Documentation](https://spring.io/projects/spring-cloud-gateway)
-- [Spring Data JPA Documentation](https://spring.io/projects/spring-data-jpa)
-- [Microservices Patterns](https://microservices.io/patterns/)
-- [Course Materials](Aulas/README.md)
+Check containers:
+
+```bash
+docker ps
+```
+
+Test direct services:
+
+```bash
+curl http://localhost:8081/users
+curl http://localhost:8082/products
+curl http://localhost:8083/orders
+```
+
+Test through API Gateway:
+
+```bash
+curl http://localhost:8088/api/users
+curl http://localhost:8088/api/products
+curl http://localhost:8088/api/orders
+```
+
+Expected result:
+
+```text
+[]
+[]
+[]
+```
+
+Stop local containers:
+
+```bash
+docker-compose -f docker-compose.light.yml down
+```
+
+---
+
+## 10. Full runtime test with Kafka and Zookeeper
+
+The first EC2 deployment attempt used a `t3.micro` instance. That instance was enough for a lighter deployment of the Spring Boot services, but it was too memory-constrained to comfortably run the complete stack with Kafka, Zookeeper and all Java services at the same time.
+
+For that reason, the EC2 instance type was changed to `t3.small`.
+
+This decision was made to support a fuller runtime test of the architecture with:
+
+```text
+API Gateway
+User Service
+Product Service
+Order Service
+Kafka
+Zookeeper
+```
+
+This test is important because the original application contains Kafka-related components, and the final cloud deployment should be able to demonstrate the messaging layer in addition to the HTTP microservices.
+
+On the EC2 instance, create a Kafka/Zookeeper compose file:
+
+```bash
+cd ~/app/microservices-project
+```
+
+```bash
+cat > docker-compose.kafka-test.yml <<'EOF'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: cis-zookeeper
+    network_mode: host
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: cis-kafka
+    network_mode: host
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: localhost:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  user-service:
+    image: 096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-user-service:latest
+    container_name: cis-user-service
+    network_mode: host
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+
+  product-service:
+    image: 096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-product-service:latest
+    container_name: cis-product-service
+    network_mode: host
+    depends_on:
+      - kafka
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+
+  order-service:
+    image: 096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-order-service:latest
+    container_name: cis-order-service
+    network_mode: host
+    depends_on:
+      - user-service
+      - product-service
+      - kafka
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+      SERVICES_USER_URL: http://localhost:8081
+      SERVICES_PRODUCT_URL: http://localhost:8082
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+
+  api-gateway:
+    image: 096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-api-gateway:latest
+    container_name: cis-api-gateway
+    network_mode: host
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8088
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+EOF
+```
+
+Remove any previous containers:
+
+```bash
+docker rm -f cis-api-gateway cis-order-service cis-product-service cis-user-service cis-kafka cis-zookeeper 2>/dev/null || true
+```
+
+Start the full stack:
+
+```bash
+docker-compose -f docker-compose.kafka-test.yml up -d
+```
+
+Kafka and Zookeeper can take longer to become ready, so wait before testing:
+
+```bash
+sleep 120
+```
+
+Check that all containers are running:
+
+```bash
+docker ps
+```
+
+Expected containers:
+
+```text
+cis-zookeeper
+cis-kafka
+cis-user-service
+cis-product-service
+cis-order-service
+cis-api-gateway
+```
+
+Check ports:
+
+```bash
+sudo ss -tulpn | grep -E '8081|8082|8083|8088|9092|2181'
+```
+
+Check available memory:
+
+```bash
+free -h
+```
+
+Test the API Gateway:
+
+```bash
+curl http://localhost:8088/api/users
+curl http://localhost:8088/api/products
+curl http://localhost:8088/api/orders
+```
+
+Expected result:
+
+```text
+[]
+[]
+[]
+```
+
+Test Kafka:
+
+```bash
+docker logs cis-kafka --tail=50
+```
+
+List Kafka topics:
+
+```bash
+docker exec cis-kafka kafka-topics --bootstrap-server localhost:9092 --list
+```
+
+If the command connects successfully and returns without a connection error, Kafka is operational.
+
+If topics were created by the application, they will appear in the output.
+
+This validates that the upgraded `t3.small` instance can run the main microservices plus the Kafka/Zookeeper asynchronous messaging layer.
+
+To stop this full test stack:
+
+```bash
+docker rm -f cis-api-gateway cis-order-service cis-product-service cis-user-service cis-kafka cis-zookeeper
+```
+
+---
+
+## 11. Configure Terraform variables
+
+Go to the Terraform environment:
+
+```bash
+cd infrastructure/terraform/environments/dev
+```
+
+Create a local `terraform.tfvars` file from the example:
+
+```bash
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit it:
+
+```bash
+notepad terraform.tfvars
+```
+
+Example values:
+
+```hcl
+project_name = "cis-final-project"
+environment  = "dev"
+aws_region   = "eu-central-1"
+
+billing_email = "your-email@example.com"
+
+monthly_budget_limit_usd     = 20
+budget_warning_threshold_usd = 5
+
+allowed_ssh_cidr  = "YOUR_PUBLIC_IP/32"
+ec2_key_name      = "cis-final-project-key"
+ec2_instance_type = "t3.small"
+
+db_name     = "microservices"
+db_username = "appuser"
+db_password = "CHANGE_THIS_PASSWORD"
+```
+
+Do not commit `terraform.tfvars`.
+
+It contains local and sensitive configuration.
+
+The `t3.small` instance type is intentionally used because the complete runtime test includes Kafka, Zookeeper and multiple Java services. This requires more memory than the lighter deployment.
+
+---
+
+## 12. Create the EC2 key pair
+
+Create an AWS key pair:
+
+```bash
+aws ec2 create-key-pair \
+  --region eu-central-1 \
+  --key-name cis-final-project-key \
+  --query "KeyMaterial" \
+  --output text > ~/Downloads/cis-final-project-key.pem
+```
+
+Protect the key:
+
+```bash
+chmod 400 ~/Downloads/cis-final-project-key.pem
+```
+
+Verify the key exists:
+
+```bash
+aws ec2 describe-key-pairs \
+  --region eu-central-1 \
+  --key-names cis-final-project-key
+```
+
+---
+
+## 13. Deploy AWS infrastructure with Terraform
+
+Initialize Terraform:
+
+```bash
+terraform init
+```
+
+Format and validate:
+
+```bash
+terraform fmt -recursive ../..
+terraform validate
+```
+
+Preview the infrastructure:
+
+```bash
+terraform plan
+```
+
+Apply:
+
+```bash
+terraform apply
+```
+
+When Terraform asks for confirmation:
+
+```text
+yes
+```
+
+After a successful apply, Terraform prints outputs such as:
+
+```text
+ec2_public_ip
+ec2_public_dns
+db_instance_endpoint
+product_events_queue_url
+ecr_repository_urls
+```
+
+Current ECR repository URLs used by this project:
+
+```text
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-api-gateway
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-user-service
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-product-service
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-order-service
+```
+
+---
+
+## 14. Configure GitHub Actions secrets
+
+The Docker/ECR workflow needs AWS credentials.
+
+Set the secrets in the repository:
+
+```bash
+gh secret set AWS_ACCESS_KEY_ID --repo ambs309/microservices-project --body "$(aws configure get aws_access_key_id)"
+gh secret set AWS_SECRET_ACCESS_KEY --repo ambs309/microservices-project --body "$(aws configure get aws_secret_access_key)"
+```
+
+Verify:
+
+```bash
+gh secret list --repo ambs309/microservices-project
+```
+
+Expected secrets:
+
+```text
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
+
+---
+
+## 15. Run GitHub Actions
+
+Push to the project branch:
+
+```bash
+git push
+```
+
+Open GitHub Actions:
+
+```text
+https://github.com/ambs309/microservices-project/actions
+```
+
+The following workflows should run:
+
+```text
+CI
+Build and Push Docker Images to ECR
+```
+
+The CI workflow validates the project with Maven.
+
+The Docker/ECR workflow builds and pushes four images:
+
+```text
+api-gateway
+user-service
+product-service
+order-service
+```
+
+---
+
+## 16. Verify images in ECR
+
+After the Docker/ECR workflow finishes, verify the images:
+
+```bash
+aws ecr list-images --region eu-central-1 --repository-name cis-final-project-dev-api-gateway
+aws ecr list-images --region eu-central-1 --repository-name cis-final-project-dev-user-service
+aws ecr list-images --region eu-central-1 --repository-name cis-final-project-dev-product-service
+aws ecr list-images --region eu-central-1 --repository-name cis-final-project-dev-order-service
+```
+
+Expected result:
+
+```text
+latest
+commit sha tag
+```
+
+---
+
+## 17. Connect to the EC2 instance
+
+Use the public IP generated by Terraform.
+
+Example:
+
+```bash
+ssh -i ~/Downloads/cis-final-project-key.pem ec2-user@3.68.217.87
+```
+
+If the IP changes, get the current value:
+
+```bash
+terraform output ec2_public_ip
+```
+
+Then connect with:
+
+```bash
+ssh -i ~/Downloads/cis-final-project-key.pem ec2-user@<EC2_PUBLIC_IP>
+```
+
+---
+
+## 18. Prepare the project on EC2
+
+Inside the EC2 instance:
+
+```bash
+mkdir -p ~/app
+cd ~/app
+```
+
+Clone the repository if it does not exist:
+
+```bash
+git clone https://github.com/ambs309/microservices-project.git
+cd microservices-project
+git checkout final-project-approach-a-clean
+```
+
+If the repository already exists:
+
+```bash
+cd ~/app/microservices-project
+git fetch origin
+git reset --hard origin/final-project-approach-a-clean
+```
+
+---
+
+## 19. Deploy with Ansible on EC2
+
+Install Ansible:
+
+```bash
+sudo dnf install -y ansible-core
+```
+
+Run the deployment playbook:
+
+```bash
+sudo ansible-playbook ansible/deploy.yml
+```
+
+Expected final recap:
+
+```text
+failed=0
+```
+
+Ansible will pull the images from ECR and start the containers.
+
+This playbook deploys the lightweight runtime with the four main services from ECR. The Kafka/Zookeeper test can then be executed separately using the commands in section 10.
+
+---
+
+## 20. Validate the deployment on EC2
+
+Check running containers:
+
+```bash
+docker ps
+```
+
+Expected containers:
+
+```text
+cis-api-gateway
+cis-user-service
+cis-product-service
+cis-order-service
+```
+
+The images should come from ECR:
+
+```text
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-api-gateway:latest
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-user-service:latest
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-product-service:latest
+096631344736.dkr.ecr.eu-central-1.amazonaws.com/cis-final-project-dev-order-service:latest
+```
+
+Test the services through the API Gateway:
+
+```bash
+curl http://localhost:8088/api/users
+curl http://localhost:8088/api/products
+curl http://localhost:8088/api/orders
+```
+
+Expected result:
+
+```text
+[]
+[]
+[]
+```
+
+The same can be tested from the local machine using the EC2 public IP:
+
+```bash
+curl http://<EC2_PUBLIC_IP>:8088/api/users
+curl http://<EC2_PUBLIC_IP>:8088/api/products
+curl http://<EC2_PUBLIC_IP>:8088/api/orders
+```
+
+Example:
+
+```bash
+curl http://3.68.217.87:8088/api/users
+curl http://3.68.217.87:8088/api/products
+curl http://3.68.217.87:8088/api/orders
+```
+
+---
+
+## 21. Useful operational commands
+
+Check memory on EC2:
+
+```bash
+free -h
+```
+
+Check containers:
+
+```bash
+docker ps
+docker ps -a
+```
+
+Check logs:
+
+```bash
+docker logs cis-api-gateway --tail=100
+docker logs cis-user-service --tail=100
+docker logs cis-product-service --tail=100
+docker logs cis-order-service --tail=100
+```
+
+For Kafka/Zookeeper logs:
+
+```bash
+docker logs cis-kafka --tail=100
+docker logs cis-zookeeper --tail=100
+```
+
+Restart lightweight deployment:
+
+```bash
+cd ~/app/microservices-project
+sudo ansible-playbook ansible/deploy.yml
+```
+
+Stop lightweight containers:
+
+```bash
+docker rm -f cis-api-gateway cis-user-service cis-product-service cis-order-service
+```
+
+Stop full Kafka/Zookeeper test stack:
+
+```bash
+docker rm -f cis-api-gateway cis-order-service cis-product-service cis-user-service cis-kafka cis-zookeeper
+```
+
+---
+
+## 22. Security notes
+
+The project includes the following security-related practices:
+
+```text
+EC2 access restricted by SSH CIDR
+Security Groups separated for application and database
+RDS deployed in private subnets
+EC2 uses IAM role instead of hardcoded AWS credentials
+ECR repositories use image scanning on push
+ECR lifecycle policy keeps only the latest images
+Terraform variables kept outside Git through terraform.tfvars
+AWS Budget alert configured
+```
+
+The EC2 role has permissions for:
+
+```text
+SSM managed instance core
+ECR read access
+SQS access
+```
+
+GitHub Actions uses repository secrets for AWS credentials.
+
+---
+
+## 23. Cost control
+
+This project creates real AWS resources.
+
+The main resources that may generate cost are:
+
+```text
+EC2 instance
+RDS database
+ECR storage
+SQS usage
+Data transfer
+```
+
+A budget alert is configured through Terraform.
+
+Check AWS resources with:
+
+```bash
+aws ec2 describe-instances --region eu-central-1
+aws rds describe-db-instances --region eu-central-1
+aws sqs list-queues --region eu-central-1
+aws ecr describe-repositories --region eu-central-1
+```
+
+The EC2 instance was upgraded to `t3.small` to support Kafka/Zookeeper testing. This improves runtime capacity but may increase cost compared with `t3.micro`.
+
+---
+
+## 24. Cleanup
+
+To remove the AWS infrastructure:
+
+```bash
+cd infrastructure/terraform/environments/dev
+terraform destroy
+```
+
+Confirm:
+
+```text
+yes
+```
+
+This removes the Terraform-managed resources, including:
+
+```text
+EC2
+RDS
+VPC resources
+SQS queues
+ECR repositories
+IAM resources
+Budget
+```
+
+Because the ECR repositories use `force_delete = true`, Terraform can remove them even if images exist.
+
+---
+
+## 25. Current project status
+
+Completed:
+
+```text
+Spring Boot microservices application
+API Gateway routing correction
+Dockerfiles for all services
+Terraform infrastructure
+Custom VPC
+EC2 instance
+RDS PostgreSQL
+SQS queue and DLQ
+IAM role and policies
+ECR repositories
+GitHub Actions CI
+GitHub Actions Docker build and push to ECR
+Ansible deployment
+Application running on EC2 using ECR images
+t3.small EC2 instance selected to support Kafka/Zookeeper runtime testing
+Kafka/Zookeeper full-stack test documented
+```
+
+Validated commands:
+
+```bash
+curl http://localhost:8088/api/users
+curl http://localhost:8088/api/products
+curl http://localhost:8088/api/orders
+```
+
+Validated result:
+
+```text
+[]
+[]
+[]
+```
+
+---
+
+## 26. Known limitations
+
+The original application uses H2 for the current runtime profile. RDS PostgreSQL is provisioned as part of the AWS infrastructure, but the current deployed runtime still uses the application profile already present in the reference project.
+
+The original application contains Kafka-based components. The lightweight deployment focuses on the four main Spring Boot services and the API Gateway. Kafka and Zookeeper are tested separately on the upgraded `t3.small` instance to validate that the cloud environment can support the asynchronous messaging layer.
+
+SQS and DLQ are provisioned in Terraform as the AWS asynchronous messaging infrastructure. At this stage, they are part of the cloud infrastructure demonstration, while Kafka remains the messaging technology present in the original application code.
+
+The EC2 deployment uses a single instance and Docker Compose. This is appropriate for the scope of the final project, but a production architecture would use ECS, EKS, an Application Load Balancer, private service networking, centralized logging, secrets management and autoscaling.
+
+---
+
+## 27. Evidence checklist for evaluation
+
+Recommended screenshots:
+
+```text
+GitHub Actions CI successful
+GitHub Actions Docker/ECR workflow successful
+ECR repositories with images and latest tags
+Terraform apply outputs
+EC2 instance running as t3.small
+RDS instance created
+SQS queue and DLQ created
+Ansible PLAY RECAP with failed=0
+docker ps showing ECR images
+curl commands returning [][][] through the API Gateway
+docker ps showing Kafka and Zookeeper in the full runtime test
+Kafka topics command executing successfully
+free -h showing memory available on t3.small
+```
+````
