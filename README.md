@@ -1,4 +1,4 @@
-````markdown
+
 # Cloud Information Systems - Final Project
 
 ## Microservices Project deployed on AWS with Terraform, Docker, ECR, GitHub Actions and Ansible
@@ -1150,4 +1150,4 @@ docker ps showing Kafka and Zookeeper in the full runtime test
 Kafka topics command executing successfully
 free -h showing memory available on t3.small
 ```
-````
+
