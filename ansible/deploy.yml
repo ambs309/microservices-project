@@ -1,0 +1,102 @@
+- name: Deploy microservices from ECR
+  hosts: localhost
+  connection: local
+  become: true
+
+  vars:
+    aws_region: eu-central-1
+    ecr_registry: 096631344736.dkr.ecr.eu-central-1.amazonaws.com
+    app_dir: /home/ec2-user/app/microservices-project
+    compose_file: /home/ec2-user/app/microservices-project/docker-compose.ecr.yml
+
+  tasks:
+    - name: Install required packages
+      dnf:
+        name:
+          - docker
+          - git
+          - awscli
+        state: present
+
+    - name: Start Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Install Docker Compose standalone
+      get_url:
+        url: https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Login to Amazon ECR
+      shell: aws ecr get-login-password --region {{ aws_region }} | docker login --username AWS --password-stdin {{ ecr_registry }}
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+
+    - name: Create Docker Compose file using ECR images
+      copy:
+        dest: "{{ compose_file }}"
+        owner: ec2-user
+        group: ec2-user
+        mode: '0644'
+        content: |
+          services:
+            user-service:
+              image: {{ ecr_registry }}/cis-final-project-dev-user-service:latest
+              container_name: cis-user-service
+              network_mode: host
+              environment:
+                SPRING_PROFILES_ACTIVE: docker
+                JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+
+            product-service:
+              image: {{ ecr_registry }}/cis-final-project-dev-product-service:latest
+              container_name: cis-product-service
+              network_mode: host
+              environment:
+                SPRING_PROFILES_ACTIVE: docker
+                JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+
+            order-service:
+              image: {{ ecr_registry }}/cis-final-project-dev-order-service:latest
+              container_name: cis-order-service
+              network_mode: host
+              environment:
+                SPRING_PROFILES_ACTIVE: docker
+                SERVICES_USER_URL: http://localhost:8081
+                SERVICES_PRODUCT_URL: http://localhost:8082
+                JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+
+            api-gateway:
+              image: {{ ecr_registry }}/cis-final-project-dev-api-gateway:latest
+              container_name: cis-api-gateway
+              network_mode: host
+              environment:
+                SPRING_PROFILES_ACTIVE: docker
+                SERVER_PORT: 8088
+                JAVA_TOOL_OPTIONS: "-Xms64m -Xmx160m"
+
+    - name: Stop previous containers
+      shell: docker rm -f cis-api-gateway cis-order-service cis-product-service cis-user-service || true
+
+    - name: Pull latest images
+      shell: docker-compose -f {{ compose_file }} pull
+
+    - name: Start services
+      shell: docker-compose -f {{ compose_file }} up -d
+
+    - name: Show running containers
+      shell: docker ps
+      register: docker_ps
+
+    - name: Print running containers
+      debug:
+        var: docker_ps.stdout
